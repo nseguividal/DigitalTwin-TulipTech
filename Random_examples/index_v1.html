@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TulipTech / Greenhouse Digital Twin</title>
+
+    <!-- Google Fonts: Syne (display) + JetBrains Mono (data readouts) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- roslibjs: The official JS client for rosbridge_suite.
+       It creates a WebSocket connection to the robot's rosbridge server
+       and lets us subscribe to topics and call services from the browser. -->
+    <script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
+
+    <!-- Chart.js: For the sensor data chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+
+    <script>
+        // Tailwind config — extend with the design tokens
+        tailwind.config = {
+        theme: {
+            extend: {
+            fontFamily: {
+                display: ['Syne', 'sans-serif'],
+                mono: ['JetBrains Mono', 'monospace'],
+            },
+            colors: {
+                greenhouse: {
+                bg:      '#0a0f0a',
+                surface: '#111911',
+                card:    '#161e16',
+                border:  '#1f2e1f',
+                green:   '#4ade80',
+                lime:    '#a3e635',
+                amber:   '#fbbf24',
+                red:     '#f87171',
+                muted:   '#4b6b4b',
+                text:    '#d1fad1',
+                }
+            }
+            }
+        }
+        }
+  </script>
+
+  <style>
+        /* ── Base ── */
+        body {
+        background-color: #0a0f0a;
+        font-family: 'Syne', sans-serif;
+        color: #d1fad1;
+        }
+    
+        /* Subtle scanline texture on the background */
+        body::before {
+        content: '';
+        position: fixed; inset: 0; z-index: 0; pointer-events: none;
+        background-image: repeating-linear-gradient(
+            0deg, transparent, transparent 2px,
+            rgba(74,222,128,0.015) 2px, rgba(74,222,128,0.015) 4px
+        );
+        }
+    
+        /* Glowing green border on active/live elements */
+        .glow-border {
+        box-shadow: 0 0 0 1px #4ade8033, 0 0 12px #4ade8018;
+        }
+    
+        /* Data readout numbers */
+        .data-value { font-family: 'JetBrains Mono', monospace; }
+    
+        /* Pulsing dot for LIVE indicators */
+        @keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: 0.4; transform: scale(0.75); }
+        }
+        .pulse-dot { animation: pulse-dot 1.8s ease-in-out infinite; }
+    
+        /* Card fade-in on load */
+        @keyframes card-in {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: translateY(0); }
+        }
+        .card-in { animation: card-in 0.5s ease forwards; }
+    
+        /* Video stream container */
+        .stream-placeholder {
+        background: repeating-linear-gradient(
+            45deg,
+            #111911 0px, #111911 10px,
+            #0f170f 10px, #0f170f 20px
+        );
+        }
+    
+        /* Status badge */
+        .badge {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.65rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        }
+  </style>
+ 
+</head>
+
+<body class="min-h-screen relative">
+    <div class="relative z-10 max-w-7xl mx-auto px-6 py-8 space-y-6">
+ 
+        <!-- ══════════════════════════════════════════════
+            HEADER
+        ══════════════════════════════════════════════ -->
+        <header class="flex items-center justify-between pb-4 border-b border-greenhouse-border">
+        <div>
+            <p class="text-greenhouse-muted badge mb-1">MDP // Tulip Greenhouse</p>
+            <h1 class="text-3xl font-display font-extrabold tracking-tight text-greenhouse-text">
+            Digital Twin <span class="text-greenhouse-green">Dashboard</span>
+            </h1>
+        </div>
+    
+        <!-- ROS Connection Status Badge -->
+        <div id="ros-status-badge"
+            class="flex items-center gap-2.5 px-4 py-2 rounded-lg border border-greenhouse-border bg-greenhouse-card glow-border card-in">
+            <span id="ros-dot" class="w-2.5 h-2.5 rounded-full bg-greenhouse-amber pulse-dot"></span>
+            <span id="ros-label" class="badge text-greenhouse-amber">Connecting to ROS…</span>
+        </div>
+        </header>
+
+        <!-- ══════════════════════════════════════════════
+            TOP ROW: Live Sensor KPIs
+        ══════════════════════════════════════════════ -->
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    
+        <!-- Temperature Card -->
+        <div class="bg-greenhouse-card border border-greenhouse-border rounded-xl p-5 card-in glow-border"
+            style="animation-delay:0.05s">
+            <p class="text-greenhouse-muted badge mb-3">Temperature</p>
+            <p id="kpi-temp" class="data-value text-4xl font-semibold text-greenhouse-green">--.-</p>
+            <p class="text-greenhouse-muted text-sm mt-1">°C · Stand <span id="kpi-stand">–</span></p>
+        </div>
+    
+        <!-- Humidity Card -->
+        <div class="bg-greenhouse-card border border-greenhouse-border rounded-xl p-5 card-in glow-border"
+            style="animation-delay:0.1s">
+            <p class="text-greenhouse-muted badge mb-3">Humidity</p>
+            <p id="kpi-humidity" class="data-value text-4xl font-semibold text-greenhouse-green">--.-</p>
+            <p class="text-greenhouse-muted text-sm mt-1">% RH</p>
+        </div>
+    
+        <!-- Robot Status Card -->
+        <div class="bg-greenhouse-card border border-greenhouse-border rounded-xl p-5 card-in"
+            style="animation-delay:0.15s">
+            <p class="text-greenhouse-muted badge mb-3">Robot Status</p>
+            <p id="kpi-robot-state" class="data-value text-2xl font-semibold text-greenhouse-amber">IDLE</p>
+            <p class="text-greenhouse-muted text-sm mt-1">Nav state</p>
+        </div>
+    
+        <!-- Anomaly Count Card -->
+        <div class="bg-greenhouse-card border border-greenhouse-border rounded-xl p-5 card-in"
+            style="animation-delay:0.2s">
+            <p class="text-greenhouse-muted badge mb-3">Anomalies</p>
+            <p id="kpi-anomalies" class="data-value text-4xl font-semibold text-greenhouse-text">0</p>
+            <p class="text-greenhouse-muted text-sm mt-1">Detected today</p>
+        </div>
+    
+        </section>
+
+        <!-- ══════════════════════════════════════════════
+            MIDDLE ROW: Video Stream + Humidity Chart
+        ══════════════════════════════════════════════ -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    
+        <!-- ── MJPEG Video Stream ── -->
+        <!--
+            HOW THE STREAM WORKS:
+            web_video_server runs on the robot and exposes MJPEG streams as a
+            plain HTTP URL. A standard HTML <img> tag can display MJPEG natively
+            because the browser just keeps receiving JPEG frames continuously.
+    
+            Default URL pattern: http://<robot_ip>:8080/stream?topic=<topic_name>
+            Replace ROBOT_IP and the topic name with your actual values.
+            Set ROBOT_IP in the <script> section below.
+        -->
+        <div class="bg-greenhouse-card border border-greenhouse-border rounded-xl overflow-hidden card-in"
+            style="animation-delay:0.25s">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-greenhouse-border">
+            <p class="badge text-greenhouse-muted">Camera Feed — Gripper View</p>
+            <div class="flex items-center gap-2">
+                <span id="stream-dot" class="w-2 h-2 rounded-full bg-greenhouse-amber pulse-dot"></span>
+                <span id="stream-label" class="badge text-greenhouse-amber">Waiting</span>
+            </div>
+            </div>
+    
+            <!-- The img src is set dynamically by JS below. -->
+            <div class="relative aspect-video stream-placeholder flex items-center justify-center">
+            <img id="mjpeg-stream"
+                class="w-full h-full object-contain hidden"
+                alt="MJPEG stream" />
+            <div id="stream-offline" class="text-center space-y-2">
+                <div class="text-4xl opacity-30">📷</div>
+                <p class="badge text-greenhouse-muted">Stream offline</p>
+                <p class="text-xs text-greenhouse-muted opacity-60">Set ROBOT_IP in the script section</p>
+            </div>
+            </div>
+        </div>
+    
+        <!-- ── Humidity Chart ── -->
+        <div class="bg-greenhouse-card border border-greenhouse-border rounded-xl overflow-hidden card-in"
+            style="animation-delay:0.3s">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-greenhouse-border">
+            <p class="badge text-greenhouse-muted">Humidity History — Last 20 Readings</p>
+            <span id="chart-stand-label" class="badge text-greenhouse-green">All stands</span>
+            </div>
+            <div class="p-4 h-64">
+            <canvas id="humidity-chart"></canvas>
+            </div>
+        </div>
+    
+        </section>
+
+        <!-- ══════════════════════════════════════════════
+            BOTTOM ROW: Sensor Readings Table
+        ══════════════════════════════════════════════ -->
+        <section class="bg-greenhouse-card border border-greenhouse-border rounded-xl overflow-hidden card-in"
+                style="animation-delay:0.35s">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-greenhouse-border">
+            <p class="badge text-greenhouse-muted">Recent Sensor Readings</p>
+            <button onclick="fetchAndRenderReadings()"
+                    class="badge text-greenhouse-green border border-greenhouse-border px-3 py-1.5 rounded hover:border-greenhouse-green transition-colors">
+            ↻ Refresh
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-greenhouse-border">
+                <th class="text-left px-5 py-2.5 badge text-greenhouse-muted">Stand</th>
+                <th class="text-left px-5 py-2.5 badge text-greenhouse-muted">Temp (°C)</th>
+                <th class="text-left px-5 py-2.5 badge text-greenhouse-muted">Humidity (%)</th>
+                <th class="text-left px-5 py-2.5 badge text-greenhouse-muted">Timestamp</th>
+                </tr>
+            </thead>
+            <tbody id="readings-table-body">
+                <tr>
+                <td colspan="4" class="px-5 py-8 text-center text-greenhouse-muted badge">
+                    No data yet — start the backend and seed the database.
+                </td>
+                </tr>
+            </tbody>
+            </table>
+        </div>
+        </section>
+
+        <!-- Footer -->
+        <p class="text-center text-greenhouse-muted badge pb-4">
+        Greenhouse Digital Twin v0.1 · Walking Skeleton
+        </p>
+ 
+    </div><!-- /z-10 wrapper -->
+
+
+    <!-- ══════════════════════════════════════════════
+       JAVASCRIPT
+    ══════════════════════════════════════════════ -->
+    <script>
+        // ─────────────────────────────────────────────
+        // ⚙️  CONFIGURATION — Edit these values
+        // ─────────────────────────────────────────────
+        const CONFIG = {
+        // Your FastAPI backend
+        API_BASE:   'http://localhost:8000',
+    
+        // Your robot's IP address on the greenhouse network
+        ROBOT_IP:   '192.168.1.100',       // <── CHANGE THIS!!
+    
+        // rosbridge WebSocket port (default: 9090)
+        ROS_PORT:   9090,
+    
+        // web_video_server HTTP port (default: 8080)
+        VIDEO_PORT: 8080,
+    
+        // ROS topic name for the gripper camera
+        CAMERA_TOPIC: '/gripper_camera/image_raw',
+    
+        // How often to auto-refresh sensor data from the API (ms)
+        REFRESH_INTERVAL_MS: 5000,
+        };
+    
+    
+        // ─────────────────────────────────────────────
+        // 📡  ROS CONNECTION (roslibjs)
+        // ─────────────────────────────────────────────
+        /*
+        roslibjs creates a WebSocket to rosbridge_suite running on the robot.
+        rosbridge translates WebSocket messages to/from ROS 2 topics and services.
+    
+        The flow is:
+            Browser ──WebSocket──► rosbridge (on robot) ──► ROS 2 topics
+        */
+        const ros = new ROSLIB.Ros({
+            url: `ws://${CONFIG.ROBOT_IP}:${CONFIG.ROS_PORT}`
+        });
+    
+        const rosStatusDot   = document.getElementById('ros-dot');
+        const rosStatusLabel = document.getElementById('ros-label');
+    
+        ros.on('connection', () => {
+            rosStatusDot.className   = 'w-2.5 h-2.5 rounded-full bg-greenhouse-green pulse-dot';
+            rosStatusLabel.className = 'badge text-greenhouse-green';
+            rosStatusLabel.textContent = 'ROS Connected';
+            console.log('✅ Connected to rosbridge');
+        });
+    
+        ros.on('error', (err) => {
+            rosStatusDot.className   = 'w-2.5 h-2.5 rounded-full bg-greenhouse-red';
+            rosStatusLabel.className = 'badge text-greenhouse-red';
+            rosStatusLabel.textContent = 'ROS Error';
+            console.warn('⚠️ ROS connection error:', err);
+        });
+    
+        ros.on('close', () => {
+            rosStatusDot.className   = 'w-2.5 h-2.5 rounded-full bg-greenhouse-amber pulse-dot';
+            rosStatusLabel.className = 'badge text-greenhouse-amber';
+            rosStatusLabel.textContent = 'ROS Disconnected';
+            console.log('🔌 ROS connection closed');
+        });
+    
+        /*
+        SUBSCRIBING TO A ROS TOPIC:
+        Once connected, you can listen to any ROS topic.
+        Uncomment the block below when you're ready to receive live robot state.
+    
+        Replace '/robot_state' with your actual ROS 2 topic name.
+        Replace 'std_msgs/String' with the correct message type.
+    
+        Example: to show navigation state on the dashboard:
+        */
+        // const robotStateTopic = new ROSLIB.Topic({
+        //   ros,
+        //   name: '/robot_state',
+        //   messageType: 'std_msgs/String'
+        // });
+        // robotStateTopic.subscribe((msg) => {
+        //   document.getElementById('kpi-robot-state').textContent = msg.data.toUpperCase();
+        // });
+    
+    
+        // ─────────────────────────────────────────────
+        // 🎥  MJPEG VIDEO STREAM (web_video_server)
+        // ─────────────────────────────────────────────
+        /*
+        web_video_server serves MJPEG as a regular HTTP URL.
+        A browser <img> tag handles MJPEG natively — the browser just keeps
+        reading the infinite stream of JPEG frames.
+    
+        The URL format is:
+            http://<robot_ip>:<video_port>/stream?topic=<ros_topic>
+    
+        We set the src dynamically, and listen for the first load event to
+        update the status indicator.
+        */
+        const streamImg     = document.getElementById('mjpeg-stream');
+        const streamOffline = document.getElementById('stream-offline');
+        const streamDot     = document.getElementById('stream-dot');
+        const streamLabel   = document.getElementById('stream-label');
+    
+        const streamUrl = `http://${CONFIG.ROBOT_IP}:${CONFIG.VIDEO_PORT}/stream?topic=${encodeURIComponent(CONFIG.CAMERA_TOPIC)}`;
+        streamImg.src = streamUrl;
+    
+        streamImg.onload = () => {
+            streamImg.classList.remove('hidden');
+            streamOffline.classList.add('hidden');
+            streamDot.className   = 'w-2 h-2 rounded-full bg-greenhouse-green pulse-dot';
+            streamLabel.className = 'badge text-greenhouse-green';
+            streamLabel.textContent = 'LIVE';
+        };
+    
+        streamImg.onerror = () => {
+            // Stream not reachable — keep showing the offline placeholder.
+            streamImg.classList.add('hidden');
+            streamOffline.classList.remove('hidden');
+        };
+    
+    
+        // ─────────────────────────────────────────────
+        // 📊  CHART.JS — Humidity Line Chart
+        // ─────────────────────────────────────────────
+        const ctx = document.getElementById('humidity-chart').getContext('2d');
+    
+        const humidityChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],      // Timestamps — filled in by fetchAndRenderReadings()
+            datasets: [{
+                label: 'Humidity %',
+                data: [],      // Humidity values
+                borderColor:        '#4ade80',
+                backgroundColor:    'rgba(74,222,128,0.08)',
+                borderWidth:        2,
+                pointRadius:        3,
+                pointBackgroundColor: '#4ade80',
+                fill:               true,
+                tension:            0.4,   // Smooth curves
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 400 },
+            scales: {
+            x: {
+                ticks: {
+                    color: '#4b6b4b',
+                    font: { family: 'JetBrains Mono', size: 10 },
+                    maxTicksLimit: 6,
+                },
+                grid: { color: '#1f2e1f' }
+            },
+            y: {
+                min: 0, max: 100,
+                ticks: {
+                    color: '#4b6b4b',
+                    font: { family: 'JetBrains Mono', size: 10 },
+                },
+                grid: { color: '#1f2e1f' }
+            }
+            },
+            plugins: {
+                legend: { display: false },
+            }
+        }
+        });
+    
+    
+        // ─────────────────────────────────────────────
+        // 🌐  API CALLS — Fetching data from FastAPI
+        // ─────────────────────────────────────────────
+        /*
+        `fetch()` is the browser's built-in HTTP client.
+        It returns a Promise — an object that represents a value we'll get
+        *in the future* (once the network request completes).
+    
+        `async/await` is syntactic sugar for working with Promises more cleanly:
+            - `async function foo()` declares that foo returns a Promise
+            - `await somePromise` pauses execution of foo until the promise resolves
+    
+        This means the browser doesn't freeze while waiting for the network.
+        */
+        async function fetchAndRenderReadings() {
+        try {
+            // `await fetch(...)` sends the HTTP GET request and waits for the response headers.
+            const response = await fetch(`${CONFIG.API_BASE}/api/sensors/?limit=20`);
+    
+            if (!response.ok) {
+                console.error('API error:', response.status);
+                return;
+            }
+    
+            // `.json()` reads and parses the response body — also async.
+            const readings = await response.json();
+    
+            // Update the table
+            renderTable(readings);
+    
+            // Update the chart
+            updateChart(readings);
+    
+            // Update KPI cards with the most recent reading
+            if (readings.length > 0) {
+                const latest = readings[0]; // API returns newest-first
+                document.getElementById('kpi-temp').textContent     = latest.temperature.toFixed(1);
+                document.getElementById('kpi-humidity').textContent = latest.humidity.toFixed(1);
+                document.getElementById('kpi-stand').textContent    = latest.stand_id;
+            }
+    
+        } catch (err) {
+            // This catches network errors (backend offline, CORS issues, etc.)
+            console.warn('Could not reach API:', err.message);
+        }
+        }
+    
+        function renderTable(readings) {
+        const tbody = document.getElementById('readings-table-body');
+    
+        if (readings.length === 0) {
+            tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="px-5 py-8 text-center text-greenhouse-muted badge">
+                No readings found. POST some data to /api/sensors/ to get started.
+                </td>
+            </tr>`;
+            return;
+        }
+    
+        tbody.innerHTML = readings.map(r => {
+            // Format the ISO timestamp to something human-readable
+            const ts = new Date(r.timestamp).toLocaleTimeString('nl-NL', {
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+            return `
+            <tr class="border-b border-greenhouse-border hover:bg-greenhouse-surface transition-colors">
+                <td class="px-5 py-3 data-value text-greenhouse-green font-semibold">${r.stand_id}</td>
+                <td class="px-5 py-3 data-value">${r.temperature.toFixed(1)}</td>
+                <td class="px-5 py-3 data-value">${r.humidity.toFixed(1)}</td>
+                <td class="px-5 py-3 data-value text-greenhouse-muted text-xs">${ts}</td>
+            </tr>`;
+        }).join('');
+        }
+    
+        function updateChart(readings) {
+            // Readings come newest-first from the API; chart should read left=oldest.
+            const sorted  = [...readings].reverse();
+            const labels  = sorted.map(r =>
+                new Date(r.timestamp).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+            );
+            const values  = sorted.map(r => r.humidity);
+        
+            humidityChart.data.labels   = labels;
+            humidityChart.data.datasets[0].data = values;
+            humidityChart.update();
+        }
+    
+    
+        // ─────────────────────────────────────────────
+        // 🚀  BOOT
+        // ─────────────────────────────────────────────
+        // Fetch immediately on page load, then repeat every REFRESH_INTERVAL_MS.
+        fetchAndRenderReadings();
+        setInterval(fetchAndRenderReadings, CONFIG.REFRESH_INTERVAL_MS);
+    </script>
+</body>

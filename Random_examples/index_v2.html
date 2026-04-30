@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TulipTech // Digital Twin</title>
+    <link rel="icon" type="image/png" href="assets/logo_small.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        tuliptech: {
+                            //green: '#4ade80',
+                            green: '#4fb275',
+                            lightgreen: '#5db753',
+                            darkgreen: '#166534',
+                            turquesa: '#4Fb2a6',
+                            orange: '#E8592A',
+                            bg: '#f8fafc',
+                            card: '#ffffff',
+                            border: '#e2e8f0'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .page { display: none; }
+        .page.active { display: block; }
+        
+        .hero-gradient { position: relative; }
+
+        .hero-gradient::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            /*background: linear-gradient(to top, rgba(22, 101, 52, 0) 0%, rgba(22, 101, 52, 0.7) 0%);*/
+            background-color: #ffffff;
+            background-position: center;
+            opacity: 1.0;
+            z-index: 0;
+        }
+
+        .hero-gradient > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .glass-card {
+            background: rgba(93, 183, 83, 0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(93, 183, 83, 0.2);
+            /*border: 1px solid rgba(232, 89, 42, 0.2);*/
+            /*border: 1px solid rgba(118, 118, 118, 0.2);*/
+        }
+
+        .stand-card { transition: all 0.3s ease; }
+        .stand-card.selected { border-color: #4ade80; background-color: #f0fdf4; transform: scale(1.05); }
+        
+        .transition-width { transition: width 0.5s ease-in-out, flex 0.5s ease-in-out; }
+
+        /* Website Background Image */
+        
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            opacity: 0.8; 
+            background-image: url('assets/greenhouse_img2.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+
+<body class="bg-tuliptech-bg text-slate-800 font-sans">
+
+    <nav class="bg-white border-b border-tuliptech-border sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-8">
+                <div class="flex items-center gap-2">
+                    <img src="assets/logo_small.png" alt="TulipTech Logo" class="h-8 w-auto">
+                    <span class="text-2xl font-bold text-tuliptech-darkgreen tracking-tighter">Tulip<span class="text-tuliptech-green">Tech</span></span>
+                </div>
+                <div class="hidden md:flex gap-6">
+                    <button onclick="showPage('dashboard')" class="nav-link font-semibold text-slate-600 hover:text-tuliptech-green" id="nav-dashboard">Dashboard</button>
+                    <button onclick="showPage('camera')" class="nav-link font-semibold text-slate-600 hover:text-tuliptech-green" id="nav-camera">Camera Feed</button>
+                    <button onclick="showPage('teleop')" class="nav-link font-semibold text-slate-600 hover:text-tuliptech-green" id="nav-teleop">Teleoperation</button>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="ros-status" class="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-500">
+                    <div id="ros-dot" class="w-2 h-2 rounded-full bg-amber-400"></div>
+                    <span id="ros-label">ROS: CONNECTING</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main id="page-dashboard" class="page active p-6 max-w-7xl mx-auto space-y-6">
+        
+        <header class="relative h-64 rounded-3xl overflow-hidden hero-gradient shadow-2xl flex flex-col justify-end p-8 text-black">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div class="glass-card rounded-2xl p-4">
+                    <p class="text-xs opacity-80 uppercase tracking-widest">Current Temperature</p>
+                    <h3 class="text-3xl font-bold">24°C</h3>
+                    <p class="text-xs opacity-80">Sunny • H:46%</p>
+                </div>
+                <div class="glass-card rounded-2xl p-4">
+                    <p class="text-xs opacity-80 uppercase tracking-widest">Found Flower Stands</p>
+                    <h3 class="text-3xl font-bold">5</h3>
+                </div>
+                <div class="glass-card rounded-2xl p-4">
+                    <p class="text-xs opacity-80 uppercase tracking-widest">Unhealthy Flower Stands</p>
+                    <h3 class="text-3xl font-bold">2</h3>
+                </div>
+            </div>
+            <div>
+                <p class="text-sm font-semibold opacity-90">FloraNova</p>
+                <h2 class="text-4xl font-extrabold">Mirte Robot X</h2>
+                <p class="text-sm opacity-80">Area: 200 m² • Flower Type: tulips</p>
+            </div>
+        </header>
+
+        <section class="flex flex-col md:flex-row gap-6">
+            
+            <div id="stands-container" class="w-full md:w-1/3 transition-width space-y-4">
+                <h3 class="text-lg font-bold flex justify-between items-center">
+                    Flower Stands
+                </h3>
+                <div id="stands-grid" class="grid grid-cols-1 gap-3">
+                    </div>
+            </div>
+
+            <div id="details-panel" class="hidden flex-1 transition-width bg-white rounded-3xl border border-tuliptech-border shadow-sm overflow-hidden flex flex-col">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div>
+                        <h3 class="text-2xl font-extrabold text-tuliptech-darkgreen">🪴 Stand <span id="display-stand-id">--</span></h3>
+                        <p class="text-sm text-slate-500">Real-time Telemetry & Diagnostics</p>
+                    </div>
+                    <div class="text-right">
+                        <span id="display-robot-state" class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold uppercase tracking-tighter">Robot: Idle</span>
+                    </div>
+                </div>
+
+                <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-4 bg-slate-50 rounded-2xl">
+                                <p class="text-xs text-slate-400 font-bold uppercase">Temperature</p>
+                                <p class="text-2xl font-bold text-slate-700"><span id="val-temp">--</span>°C</p>
+                            </div>
+                            <div class="p-4 bg-slate-50 rounded-2xl">
+                                <p class="text-xs text-slate-400 font-bold uppercase">Humidity</p>
+                                <p class="text-2xl font-bold text-slate-700"><span id="val-hum">--</span>%</p>
+                            </div>
+                        </div>
+
+                        <div class="p-4 border border-tuliptech-border rounded-2xl">
+                            <p class="text-xs text-slate-400 font-bold uppercase mb-2">Flower State</p>
+                            <div class="flex items-center gap-3">
+                                <div id="val-status-dot" class="w-3 h-3 rounded-full bg-green-500"></div>
+                                <span id="val-status-text" class="font-bold text-green-600 text-lg">HEALTHY</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-2 italic">Last check: <span id="val-last-check">--:--:--</span></p>
+                        </div>
+
+                        <div class="flex flex-col gap-2">
+                            <button onclick="sendCommand('read_sensors')" class="w-full border-2 border-tuliptech-darkgreen text-tuliptech-darkgreen py-3 rounded-xl font-bold hover:bg-tuliptech-darkgreen hover:text-white transition-all active:scale-95">Send robot to Read Sensor</button>
+                            <button onclick="sendCommand('check_flowers')" class="w-full border-2 border-tuliptech-darkgreen text-tuliptech-darkgreen py-3 rounded-xl font-bold hover:bg-tuliptech-darkgreen hover:text-white transition-all active:scale-95">Send robot to Check Flower Health</button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="h-40 bg-white border border-slate-100 rounded-xl p-2">
+                            <canvas id="chart-temp"></canvas>
+                        </div>
+                        <div class="h-40 bg-white border border-slate-100 rounded-xl p-2">
+                            <canvas id="chart-hum"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="global-robot-panel" class="flex-1 bg-white rounded-3xl border border-tuliptech-border p-8 flex flex-col items-center justify-center text-center">
+                <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                    <span class="text-3xl">🪴</span>
+                </div>
+                <h3 class="text-2xl font-extrabold text-tuliptech-darkgreen">Monitoring Dashboard</h3>
+                <p class="text-slate-600 max-w-sm mt-3 leading-relaxed">Your digital twin is synchronized with <b>Mirte Robot X</b>. Select a flower stand from the list to analyze real-time telemetry and plant health.</p>
+            </div>
+        </section>
+
+        <section class="bg-white rounded-3xl border border-tuliptech-border overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="font-bold">Live Visual Feed</h3>
+                <span class="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-black rounded uppercase pulse-dot">Live Stream</span>
+            </div>
+            <div class="aspect-video bg-slate-900 flex items-center justify-center relative">
+                 <img id="mjpeg-stream" class="w-full h-full object-cover opacity-80" alt="Video Feed" />
+                 <div id="stream-placeholder" class="absolute inset-0 flex items-center justify-center text-white/20 flex-col">
+                    <p class="text-4xl">📷</p>
+                    <p class="text-xs uppercase tracking-tighter">Connection Pending</p>
+                 </div>
+            </div>
+        </section>
+    </main>
+
+    <main id="page-camera" class="page p-12 text-center">
+        <h2 class="text-3xl font-bold">Advanced Camera Control</h2>
+        <p class="text-slate-500">Full-screen visual diagnostics module.</p>
+    </main>
+
+    <main id="page-teleop" class="page p-12 text-center">
+        <h2 class="text-3xl font-bold">Robot Teleoperation</h2>
+        <p class="text-slate-500">Manual override and drive controls.</p>
+    </main>
+
+
+    <script>
+        // ─────────────────────────────────────────────
+        // ⚙️ CONFIG & STATE
+        // ─────────────────────────────────────────────
+        const CONFIG = {
+            ROBOT_IP: '192.168.1.100', // CHANGE THIS
+            ROS_PORT: 9090,
+            CAMERA_TOPIC: '/gripper_camera/image_raw'
+        };
+
+        let selectedStand = null;
+
+        // ─────────────────────────────────────────────
+        // 🧭 NAVIGATION LOGIC
+        // ─────────────────────────────────────────────
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(`page-${pageId}`).classList.add('active');
+            
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('text-tuliptech-green'));
+            document.getElementById(`nav-${pageId}`).classList.add('text-tuliptech-green');
+        }
+
+        // ─────────────────────────────────────────────
+        // 🌸 STAND MANAGEMENT
+        // ─────────────────────────────────────────────
+        function initStands() {
+            const grid = document.getElementById('stands-grid');
+            for(let i=1; i<=5; i++) {
+                const div = document.createElement('div');
+                div.className = "stand-card bg-white border border-tuliptech-border p-5 rounded-2xl cursor-pointer hover:shadow-md flex justify-between items-center";
+                div.id = `stand-${i}`;
+                div.onclick = () => selectStand(i);
+                div.innerHTML = `
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 bg-tuliptech-orange rounded-lg flex items-center justify-center font-bold text-white">${i}</div>
+                        <div>
+                            <p class="font-bold text-slate-700">Stand ${i}</p>
+                            <p class="text-xs text-slate-400">Tulipa Gesneriana</p>
+                        </div>
+                    </div>
+                    <div class="w-2 h-2 rounded-full bg-tuliptech-orange"></div>
+                `;
+                grid.appendChild(div);
+            }
+        }
+
+        function selectStand(id) {
+            selectedStand = id;
+            
+            // UI Transitions
+            document.getElementById('stands-container').classList.replace('md:w-1/3', 'md:w-1/4');
+            document.getElementById('global-robot-panel').classList.add('hidden');
+            document.getElementById('details-panel').classList.remove('hidden');
+            
+            // Highlight selected
+            document.querySelectorAll('.stand-card').forEach(c => c.classList.remove('selected'));
+            document.getElementById(`stand-${id}`).classList.add('selected');
+
+            // Update Labels
+            document.getElementById('display-stand-id').innerText = id;
+            
+            // Simulate data fetch
+            refreshData();
+        }
+
+        // ─────────────────────────────────────────────
+        // 📊 CHARTS
+        // ─────────────────────────────────────────────
+        const createChart = (id, label, color) => {
+            return new Chart(document.getElementById(id), {
+                type: 'line',
+                data: { labels: ['-5m', '-4m', '-3m', '-2m', '-1m', 'Now'], datasets: [{ label: label, data: [0,0,0,0,0,0], borderColor: color, tension: 0.4, fill: false }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false } } } }
+            });
+        };
+
+        const chartTemp = createChart('chart-temp', 'Temp', '#f87171');
+        const chartHum = createChart('chart-hum', 'Humidity', '#60a5fa');
+
+        // ─────────────────────────────────────────────
+        // 📡 ROS & DATA SIMULATION
+        // ─────────────────────────────────────────────
+        function refreshData() {
+            // Mocking the update - in real life, this fetches from your FastAPI
+            document.getElementById('val-temp').innerText = (22 + Math.random()*3).toFixed(1);
+            document.getElementById('val-hum').innerText = (45 + Math.random()*10).toFixed(1);
+            document.getElementById('val-last-check').innerText = new Date().toLocaleTimeString();
+            
+            // Randomize charts
+            chartTemp.data.datasets[0].data = Array.from({length: 6}, () => Math.random() * 5 + 20);
+            chartHum.data.datasets[0].data = Array.from({length: 6}, () => Math.random() * 20 + 40);
+            chartTemp.update();
+            chartHum.update();
+        }
+
+        function sendCommand(cmd) {
+            console.log(`Sending command to ROS: ${cmd} for Stand ${selectedStand}`);
+            alert(`Robot command sent: ${cmd} for Stand ${selectedStand}`);
+        }
+
+        // Initialize
+        initStands();
+        
+        // Setup Video (Same logic as original)
+        const streamImg = document.getElementById('mjpeg-stream');
+        streamImg.src = `http://${CONFIG.ROBOT_IP}:8080/stream?topic=${encodeURIComponent(CONFIG.CAMERA_TOPIC)}`;
+        streamImg.onload = () => document.getElementById('stream-placeholder').classList.add('hidden');
+
+    </script>
+</body>
+</html>

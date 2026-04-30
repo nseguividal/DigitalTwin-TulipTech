@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+ENV/
+.env
+
+# SQLite Database
+*.db
+*.db-journal
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# ROS / Build Artifacts
+build/
+install/
+log/
+
+# Frontend
+node_modules/
