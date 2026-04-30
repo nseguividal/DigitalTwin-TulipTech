@@ -1,7 +1,7 @@
 # DigitalTwin-TulipTech
 Digital Twin Interface for the course Multidisciplinary Project at TU Delft.  
 
-**Group 16**: TU Delft - Núria Seguí Vidal · Gonçalo Fernández-Nespral Vaz · Twan Grooff · Javier Gil Avilés · Tom van Beekhoff  
+**Group 16**: TU Delft - Núria Seguí Vidal · Gonçalo Fernández-Nespral Vaz · Twan Grooff · Javier Gil Avilés · Tom van Beekhoff 
 
 ## How to Run It
 ### Step 1 - Install dependencies:
